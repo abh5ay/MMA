@@ -282,7 +282,7 @@ def training_status(job_id: str):
 @router.post("/api/train/predict/{model_name}")
 def predict(model_name: str, req: PredictRequest = Body(...)):
     """Run inference on a saved model."""
-    import joblib, pandas as pd
+    import joblib, pandas as pd, numpy as np
     model_dir  = os.path.join(WORKSPACE, model_name)
     model_path = os.path.join(model_dir, "model.pkl")
     meta_path  = os.path.join(model_dir, "meta.json")
@@ -294,10 +294,23 @@ def predict(model_name: str, req: PredictRequest = Body(...)):
     with open(meta_path) as f:
         meta = json.load(f)
 
-    # Build feature row
-    row = {feat: req.input_data.get(feat, 0) for feat in meta["features"]}
+    # Build feature row — coerce values to numbers where possible
+    def _coerce(v):
+        try: return float(v)
+        except (ValueError, TypeError): return str(v)
+
+    row = {feat: _coerce(req.input_data.get(feat, 0)) for feat in meta["features"]}
     df  = pd.DataFrame([row])
     pred = model.predict(df)[0]
+
+    # Convert numpy scalar → native Python type
+    def _to_python(val):
+        if isinstance(val, (np.integer,)):  return int(val)
+        if isinstance(val, (np.floating,)): return float(val)
+        if isinstance(val, (np.bool_,)):    return bool(val)
+        return val
+
+    pred = _to_python(pred)
 
     # Decode label if classification
     if meta.get("target_classes") and isinstance(pred, (int, float)):
@@ -307,8 +320,9 @@ def predict(model_name: str, req: PredictRequest = Body(...)):
     proba = None
     if hasattr(model, "predict_proba"):
         raw = model.predict_proba(df)[0]
-        proba = {meta["target_classes"][i]: round(float(p), 4)
-                 for i, p in enumerate(raw)} if meta.get("target_classes") else None
+        if meta.get("target_classes"):
+            proba = {meta["target_classes"][i]: round(float(p), 4)
+                     for i, p in enumerate(raw)}
 
     return {"prediction": pred, "probabilities": proba, "model": model_name}
 
@@ -323,3 +337,4 @@ def list_models():
             with open(meta_path) as f:
                 models.append(json.load(f))
     return {"models": models}
+
