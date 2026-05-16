@@ -7,3 +7,7 @@ pydantic
 huggingface-hub
 transformers
 peft
+pandas
+scikit-learn
+joblib
+numpy
