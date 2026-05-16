@@ -16,7 +16,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ChatMessage from './ChatMessage';
 
-const STREAM_URL = 'http://localhost:8000/chat/stream';
+const STREAM_URL = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/chat/stream`;
 
 // ── Inline Plan Card ─────────────────────────────────────────────────────────
 const planMd = {

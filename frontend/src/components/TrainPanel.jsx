@@ -12,7 +12,7 @@ import MemoryIcon        from '@mui/icons-material/Memory';
 import CheckCircleIcon   from '@mui/icons-material/CheckCircle';
 import ErrorIcon         from '@mui/icons-material/Error';
 
-const API = 'http://localhost:8000';
+const API = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
 const STATUS_COLOR = {
   queued:        '#fbbf24',
