@@ -10,4 +10,4 @@ peft
 pandas
 scikit-learn
 joblib
-numpy
+numpygoogle-generativeai

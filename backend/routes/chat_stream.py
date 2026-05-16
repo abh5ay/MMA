@@ -25,12 +25,13 @@ import requests as req
 router  = APIRouter()
 logger  = logging.getLogger(__name__)
 
-HF_KEY       = os.getenv("HUGGINGFACE_API_KEY", "")
-NVIDIA_KEY       = os.getenv("NVIDIA_API_KEY", "")
+HF_KEY             = os.getenv("HUGGINGFACE_API_KEY", "")
+NVIDIA_KEY         = os.getenv("NVIDIA_API_KEY", "")
 NVIDIA_MISTRAL_KEY = os.getenv("NVIDIA_MISTRAL_KEY", "")
-XAI_KEY          = os.getenv("XAI_API_KEY", "")
-TOGETHER_KEY = os.getenv("TOGETHER_API_KEY", "")
-CEREBRAS_KEY = os.getenv("CEREBRAS_API_KEY", "")
+XAI_KEY            = os.getenv("XAI_API_KEY", "")
+TOGETHER_KEY       = os.getenv("TOGETHER_API_KEY", "")
+CEREBRAS_KEY       = os.getenv("CEREBRAS_API_KEY", "")
+GEMINI_KEY         = os.getenv("GEMINI_API_KEY", "")
 
 PLAN_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "agent_workspace", "implementation.md")
@@ -391,9 +392,9 @@ def _stream_nvidia_mistral(messages):
         "Content-Type": "application/json",
     }
     payload = {
-        "model": "mistralai/mistral-medium-3.5-128b",
+        "model": "mistralai/mistral-large-2407",
         "messages": messages,
-        "max_tokens": 8192,
+        "max_tokens": 4096,
         "temperature": 0.5,
         "stream": True,
     }
@@ -415,6 +416,31 @@ def _stream_nvidia_mistral(messages):
             continue
 
 
+def _stream_gemini(messages):
+    """Yields text tokens from Google Gemini streaming API."""
+    import google.generativeai as genai
+    genai.configure(api_key=GEMINI_KEY)
+    model = genai.GenerativeModel('gemini-2.0-flash')
+    
+    # Convert role format
+    gemini_messages = []
+    system_instruction = None
+    for m in messages:
+        if m["role"] == "system":
+            system_instruction = m["content"]
+        else:
+            role = "model" if m["role"] == "assistant" else "user"
+            gemini_messages.append({"role": role, "parts": [m["content"]]})
+            
+    if system_instruction:
+        model = genai.GenerativeModel('gemini-2.0-flash', system_instruction=system_instruction)
+        
+    response = model.generate_content(gemini_messages, stream=True)
+    for chunk in response:
+        if chunk.text:
+            yield chunk.text
+
+
 def _get_streamer(model_id: str):
     if model_id == "api:nvidia":          return _stream_nvidia
     if model_id == "api:nvidia-mistral":  return _stream_nvidia_mistral
@@ -422,6 +448,7 @@ def _get_streamer(model_id: str):
     if model_id == "api:gpt-oss":         return _stream_gpt_oss
     if model_id == "api:together":        return _stream_together
     if model_id == "api:cerebras":        return _stream_cerebras
+    if model_id == "api:gemini":          return _stream_gemini
     return _stream_hf   # default (api:hf + Qwen-72B)
 
 
@@ -518,7 +545,7 @@ def _events_simple(prompt: str, system: str, streamer):
 def _all_events(request: StreamRequest):
     """Top-level sync generator combining all phases."""
     try:
-        is_agentic_model = request.model in ("api:hf", "api:nvidia", "api:nvidia-mistral", "api:grok", "api:gpt-oss", "api:together", "api:cerebras")
+        is_agentic_model = request.model in ("api:hf", "api:nvidia", "api:nvidia-mistral", "api:grok", "api:gpt-oss", "api:together", "api:cerebras", "api:gemini")
         is_dev_agent     = request.agent == "development"
         system           = AGENT_PROMPTS.get(request.agent, "You are a helpful AI assistant.")
         streamer         = _get_streamer(request.model)
