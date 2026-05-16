@@ -22,7 +22,8 @@ jobs: dict = {}
 
 
 class TrainRequest(BaseModel):
-    dataset_url:  str
+    dataset_url:  Optional[str] = None
+    local_path:   Optional[str] = None
     target_column: Optional[str] = None   # CSV column to predict
     model_type:   Optional[str] = "auto"  # auto | classification | regression | nlp
     model_name:   Optional[str] = "my_model"
@@ -48,70 +49,66 @@ def _run_training(job_id: str, req: TrainRequest):
                                      classification_report)
         import joblib
 
-        # ── Step 1: Download dataset ──────────────────────────────────────────
-        job["status"] = "downloading"
-        raw_url = req.dataset_url.strip()
-
-        # ── Normalise popular URL patterns ────────────────────────────────────
-        # Kaggle dataset page  →  direct CSV via kaggle datasets download is not
-        # available without auth, so we point users to a raw CSV mirror or
-        # surface a clear error instead of silently downloading HTML.
-        if "kaggle.com/datasets" in raw_url and not raw_url.endswith(".csv"):
-            raise RuntimeError(
-                "Kaggle dataset page URLs cannot be downloaded directly (login required). "
-                "Please provide a direct raw CSV URL instead.\n"
-                "💡 Tip: Open the dataset on Kaggle → click the CSV file → copy the raw/download URL, "
-                "OR use a mirror like: https://raw.githubusercontent.com/... or any public direct CSV link."
-            )
-
-        # GitHub blob → raw
-        if "github.com" in raw_url and "/blob/" in raw_url:
-            raw_url = raw_url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
-
-        job["log"].append(f"⬇️  Downloading dataset from {raw_url}")
-
-        # Determine local file extension
-        url_path = raw_url.split("?")[0]
-        ext = url_path.split(".")[-1].lower()
-        local_ext = ext if ext in ("csv", "json", "tsv", "zip") else "csv"
-        data_path = os.path.join(model_dir, f"dataset.{local_ext}")
-
-        result = subprocess.run(
-            ["curl", "-L", "-A", "Mozilla/5.0",
-             "-w", "%{http_code}",   # write HTTP status to stdout
-             "-o", data_path, raw_url],
-            capture_output=True, text=True, timeout=120
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"Download failed: {result.stderr}")
-        http_code = result.stdout.strip()
-        if http_code and http_code != "200":
-            raise RuntimeError(
-                f"URL returned HTTP {http_code}. "
-                "Please check the URL is a valid, publicly accessible direct download link."
-            )
-
-        # ── Unzip if needed ───────────────────────────────────────────────────
-        if data_path.endswith(".zip"):
-            job["log"].append("📦 Extracting zip archive…")
-            with zipfile.ZipFile(data_path, "r") as zf:
-                csv_files = [n for n in zf.namelist() if n.lower().endswith(".csv")]
-                if not csv_files:
-                    raise RuntimeError("No CSV file found inside the zip archive.")
-                zf.extract(csv_files[0], model_dir)
-                data_path = os.path.join(model_dir, csv_files[0])
-            job["log"].append(f"✅ Extracted → {data_path}")
+        # ── Step 1: Download or locate dataset ────────────────────────────────
+        if req.local_path:
+            data_path = req.local_path
+            job["log"].append(f"✅ Using uploaded dataset → {data_path}")
         else:
-            # Sanity-check: make sure we didn't download an HTML error page
-            with open(data_path, "r", errors="replace") as f:
-                head = f.read(512)
-            if head.strip().lower().startswith("<!doctype") or "<html" in head.lower():
+            job["status"] = "downloading"
+            raw_url = (req.dataset_url or "").strip()
+
+            if "kaggle.com/datasets" in raw_url and not raw_url.endswith(".csv"):
                 raise RuntimeError(
-                    "The URL returned an HTML page, not a dataset file. "
-                    "Please provide a direct download link to a CSV/JSON/TSV file."
+                    "Kaggle dataset page URLs cannot be downloaded directly (login required). "
+                    "Please provide a direct raw CSV URL instead.\n"
+                    "💡 Tip: Open the dataset on Kaggle → click the CSV file → copy the raw/download URL, "
+                    "OR use a mirror like: https://raw.githubusercontent.com/... or any public direct CSV link."
                 )
 
-        job["log"].append(f"✅ Dataset saved → {data_path}")
+            if "github.com" in raw_url and "/blob/" in raw_url:
+                raw_url = raw_url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+
+            job["log"].append(f"⬇️  Downloading dataset from {raw_url}")
+
+            url_path = raw_url.split("?")[0]
+            ext = url_path.split(".")[-1].lower()
+            local_ext = ext if ext in ("csv", "json", "tsv", "zip") else "csv"
+            data_path = os.path.join(model_dir, f"dataset.{local_ext}")
+
+            result = subprocess.run(
+                ["curl", "-L", "-A", "Mozilla/5.0",
+                 "-w", "%{http_code}",
+                 "-o", data_path, raw_url],
+                capture_output=True, text=True, timeout=120
+            )
+            if result.returncode != 0:
+                raise RuntimeError(f"Download failed: {result.stderr}")
+            http_code = result.stdout.strip()
+            if http_code and http_code != "200":
+                raise RuntimeError(
+                    f"URL returned HTTP {http_code}. "
+                    "Please check the URL is a valid, publicly accessible direct download link."
+                )
+
+            if data_path.endswith(".zip"):
+                job["log"].append("📦 Extracting zip archive…")
+                with zipfile.ZipFile(data_path, "r") as zf:
+                    csv_files = [n for n in zf.namelist() if n.lower().endswith(".csv")]
+                    if not csv_files:
+                        raise RuntimeError("No CSV file found inside the zip archive.")
+                    zf.extract(csv_files[0], model_dir)
+                    data_path = os.path.join(model_dir, csv_files[0])
+                job["log"].append(f"✅ Extracted → {data_path}")
+            else:
+                with open(data_path, "r", errors="replace") as f:
+                    head = f.read(512)
+                if head.strip().lower().startswith("<!doctype") or "<html" in head.lower():
+                    raise RuntimeError(
+                        "The URL returned an HTML page, not a dataset file. "
+                        "Please provide a direct download link to a CSV/JSON/TSV file."
+                    )
+
+            job["log"].append(f"✅ Dataset saved → {data_path}")
 
         # ── Step 2: Load & inspect ────────────────────────────────────────────
         job["status"] = "loading"
@@ -270,6 +267,39 @@ def start_training(req: TrainRequest = Body(...)):
     t = threading.Thread(target=_run_training, args=(job_id, req), daemon=True)
     t.start()
     return {"job_id": job_id, "message": "Training started"}
+
+
+from fastapi import UploadFile, File, Form
+@router.post("/api/train/upload")
+async def upload_training(
+    file: UploadFile = File(...),
+    target_column: Optional[str] = Form(None),
+    model_type: str = Form("auto"),
+    model_name: str = Form("my_model")
+):
+    """Start training from an uploaded CSV file."""
+    job_id = str(uuid.uuid4())[:8]
+    jobs[job_id] = {"status": "queued", "log": [], "job_id": job_id}
+
+    model_dir = os.path.join(WORKSPACE, model_name)
+    os.makedirs(model_dir, exist_ok=True)
+    local_path = os.path.join(model_dir, file.filename)
+
+    with open(local_path, "wb") as buffer:
+        import shutil
+        shutil.copyfileobj(file.file, buffer)
+
+    req = TrainRequest(
+        dataset_url="",
+        local_path=local_path,
+        target_column=target_column,
+        model_type=model_type,
+        model_name=model_name
+    )
+
+    t = threading.Thread(target=_run_training, args=(job_id, req), daemon=True)
+    t.start()
+    return {"job_id": job_id, "message": "Training started from upload"}
 
 
 @router.get("/api/train/status/{job_id}")

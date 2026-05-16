@@ -20,17 +20,17 @@ const STREAM_URL = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000
 
 // ── Inline Plan Card ─────────────────────────────────────────────────────────
 const planMd = {
-  h1: ({ children }) => <Typography sx={{ fontSize: '17px', fontWeight: 700, color: '#fff', mt: 2, mb: 1, pb: 0.5, borderBottom: '1px solid rgba(124,92,252,0.3)' }}>{children}</Typography>,
-  h2: ({ children }) => <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#a78bfa', mt: 1.5, mb: 0.4 }}>{children}</Typography>,
-  h3: ({ children }) => <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#c4b5fd', mt: 1, mb: 0.3 }}>{children}</Typography>,
-  p:  ({ children }) => <Typography sx={{ fontSize: '13.5px', color: '#e8e9ee', lineHeight: 1.7, mb: 0.8 }}>{children}</Typography>,
+  h1: ({ children }) => <Typography sx={{ fontSize: '20px', fontWeight: 700, color: '#fff', mt: 2, mb: 1, pb: 0.5, borderBottom: '1px solid rgba(124,92,252,0.3)' }}>{children}</Typography>,
+  h2: ({ children }) => <Typography sx={{ fontSize: '16px', fontWeight: 700, color: '#a78bfa', mt: 1.5, mb: 0.4 }}>{children}</Typography>,
+  h3: ({ children }) => <Typography sx={{ fontSize: '15px', fontWeight: 600, color: '#c4b5fd', mt: 1, mb: 0.3 }}>{children}</Typography>,
+  p:  ({ children }) => <Typography sx={{ fontSize: '15px', color: '#e8e9ee', lineHeight: 1.7, mb: 0.8 }}>{children}</Typography>,
   strong: ({ children }) => <Box component="strong" sx={{ color: '#fff', fontWeight: 700 }}>{children}</Box>,
   ul: ({ children }) => <Box component="ul" sx={{ pl: 2.5, mb: 0.8 }}>{children}</Box>,
   ol: ({ children }) => <Box component="ol" sx={{ pl: 2.5, mb: 0.8 }}>{children}</Box>,
-  li: ({ children }) => <Box component="li" sx={{ fontSize: '13.5px', color: '#e8e9ee', lineHeight: 1.65, mb: 0.3 }}>{children}</Box>,
+  li: ({ children }) => <Box component="li" sx={{ fontSize: '15px', color: '#e8e9ee', lineHeight: 1.65, mb: 0.3 }}>{children}</Box>,
   code({ inline, children }) {
-    if (inline) return <Box component="code" sx={{ px: '5px', bgcolor: 'rgba(124,92,252,0.15)', borderRadius: '4px', fontFamily: "'JetBrains Mono'", fontSize: '12px', color: '#c4b5fd' }}>{children}</Box>;
-    return <Box component="pre" sx={{ my: 1, p: 1.5, bgcolor: 'rgba(0,0,0,0.3)', borderRadius: '8px', fontFamily: "'JetBrains Mono'", fontSize: '12px', color: '#9395a5', overflowX: 'auto', whiteSpace: 'pre', lineHeight: 1.6 }}><Box component="code">{children}</Box></Box>;
+    if (inline) return <Box component="code" sx={{ px: '5px', bgcolor: 'rgba(124,92,252,0.15)', borderRadius: '4px', fontFamily: "'JetBrains Mono'", fontSize: '13px', color: '#c4b5fd' }}>{children}</Box>;
+    return <Box component="pre" sx={{ my: 1, p: 1.5, bgcolor: 'rgba(0,0,0,0.3)', borderRadius: '8px', fontFamily: "'JetBrains Mono'", fontSize: '13px', color: '#9395a5', overflowX: 'auto', whiteSpace: 'pre', lineHeight: 1.6 }}><Box component="code">{children}</Box></Box>;
   },
   hr: () => <Box sx={{ borderBottom: '1px solid rgba(255,255,255,0.07)', my: 1.5 }} />,
 };
@@ -66,7 +66,7 @@ function PlanCard({ planContent, planReady, onApprove, loading }) {
 
       {/* Scrollable plan content */}
       <Collapse in={open}>
-        <Box sx={{ px: 2.5, py: 2, maxHeight: 380, overflowY: 'auto' }}>
+        <Box sx={{ px: 2.5, py: 2, maxHeight: 500, overflowY: 'auto' }}>
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={planMd}>{text}</ReactMarkdown>
           {isBuilding && (
             <Box component="span" sx={{ display: 'inline-block', width: '2px', height: '16px', bgcolor: '#7c5cfc', ml: 0.3, verticalAlign: 'middle', animation: 'blink 0.7s step-end infinite' }} />

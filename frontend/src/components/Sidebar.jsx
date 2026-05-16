@@ -60,7 +60,7 @@ function SectionLabel({ children }) {
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ onSelect }) {
   const [agent, setAgent] = useState('development');
   const [model, setModel] = useState('api:hf');
 
@@ -69,8 +69,8 @@ export default function Sidebar() {
     localStorage.setItem('selectedModel', 'api:hf');
   }, []);
 
-  const selectAgent = (id) => { setAgent(id); localStorage.setItem('selectedAgent', id); };
-  const selectModel = (id) => { setModel(id); localStorage.setItem('selectedModel', id); };
+  const selectAgent = (id) => { setAgent(id); localStorage.setItem('selectedAgent', id); if (onSelect) onSelect(); };
+  const selectModel = (id) => { setModel(id); localStorage.setItem('selectedModel', id); if (onSelect) onSelect(); };
 
   return (
     <Box sx={{

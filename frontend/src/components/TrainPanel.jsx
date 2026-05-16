@@ -26,6 +26,7 @@ const STATUS_COLOR = {
 
 export default function TrainPanel() {
   const [datasetUrl,    setDatasetUrl]    = useState('');
+  const [file,          setFile]          = useState(null);
   const [targetCol,     setTargetCol]     = useState('');
   const [modelName,     setModelName]     = useState('my_model');
   const [taskType,      setTaskType]      = useState('auto');
@@ -73,21 +74,34 @@ export default function TrainPanel() {
   useEffect(() => { fetchModels(); }, []);
 
   const startTraining = async () => {
-    if (!datasetUrl.trim()) return;
+    if (!datasetUrl.trim() && !file) return;
     setLoading(true);
     setJob(null);
     setPredResult(null);
     try {
-      const r = await fetch(`${API}/api/train`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          dataset_url:   datasetUrl.trim(),
-          target_column: targetCol.trim() || null,
-          model_type:    taskType,
-          model_name:    modelName.trim() || 'my_model',
-        }),
-      });
+      let r;
+      if (file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (targetCol.trim()) formData.append('target_column', targetCol.trim());
+        formData.append('model_type', taskType);
+        formData.append('model_name', modelName.trim() || 'my_model');
+        r = await fetch(`${API}/api/train/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+      } else {
+        r = await fetch(`${API}/api/train`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dataset_url:   datasetUrl.trim(),
+            target_column: targetCol.trim() || null,
+            model_type:    taskType,
+            model_name:    modelName.trim() || 'my_model',
+          }),
+        });
+      }
       const d = await r.json();
       setJobId(d.job_id);
     } catch (e) {
@@ -135,12 +149,24 @@ export default function TrainPanel() {
           🗂️ Dataset Configuration
         </Typography>
 
-        <TextField
-          fullWidth label="Dataset URL (CSV / JSON)" variant="outlined" size="small"
-          value={datasetUrl} onChange={e => setDatasetUrl(e.target.value)}
-          placeholder="https://example.com/iris.csv"
-          sx={{ mb: 2, '& .MuiOutlinedInput-root': { color: 'var(--text-1)', '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' } }, '& label': { color: 'var(--text-3)' } }}
-        />
+        <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+          <TextField
+            fullWidth label="Dataset URL (CSV / JSON)" variant="outlined" size="small"
+            value={datasetUrl} onChange={e => { setDatasetUrl(e.target.value); setFile(null); }}
+            placeholder="https://example.com/iris.csv"
+            sx={{ flex: 1, '& .MuiOutlinedInput-root': { color: 'var(--text-1)', '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' } }, '& label': { color: 'var(--text-3)' } }}
+          />
+          <Typography sx={{ color: 'var(--text-3)', fontSize: '13px' }}>OR</Typography>
+          <Button variant="outlined" component="label" sx={{ height: 40, borderColor: 'rgba(255,255,255,0.15)', color: 'var(--text-1)', textTransform: 'none' }}>
+            {file ? file.name : 'Upload CSV'}
+            <input type="file" accept=".csv" hidden onChange={e => {
+              if (e.target.files[0]) {
+                setFile(e.target.files[0]);
+                setDatasetUrl('');
+              }
+            }} />
+          </Button>
+        </Box>
 
         <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
           <TextField
@@ -167,7 +193,7 @@ export default function TrainPanel() {
 
         <Button
           variant="contained" startIcon={loading ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <PlayArrowIcon />}
-          onClick={startTraining} disabled={loading || !datasetUrl.trim()}
+          onClick={startTraining} disabled={loading || (!datasetUrl.trim() && !file)}
           sx={{ bgcolor: '#7c5cfc', '&:hover': { bgcolor: '#6d4fe8' }, textTransform: 'none', fontWeight: 700, borderRadius: '8px', px: 3 }}
         >
           {loading ? 'Training…' : 'Start Training'}
