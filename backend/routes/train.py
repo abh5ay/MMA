@@ -42,7 +42,7 @@ def _run_training(job_id: str, req: TrainRequest):
     os.makedirs(model_dir, exist_ok=True)
 
     try:
-        import subprocess, pandas as pd, numpy as np
+        import subprocess, pandas as pd, numpy as np, zipfile, csv, io, shutil
         from sklearn.model_selection import train_test_split
         from sklearn.metrics import (accuracy_score, mean_squared_error,
                                      classification_report)
@@ -50,17 +50,59 @@ def _run_training(job_id: str, req: TrainRequest):
 
         # ── Step 1: Download dataset ──────────────────────────────────────────
         job["status"] = "downloading"
-        job["log"].append(f"⬇️  Downloading dataset from {req.dataset_url}")
+        raw_url = req.dataset_url.strip()
 
-        ext = req.dataset_url.split("?")[0].split(".")[-1].lower()
-        data_path = os.path.join(model_dir, f"dataset.{ext if ext in ('csv','json','tsv') else 'csv'}")
+        # ── Normalise popular URL patterns ────────────────────────────────────
+        # Kaggle dataset page  →  direct CSV via kaggle datasets download is not
+        # available without auth, so we point users to a raw CSV mirror or
+        # surface a clear error instead of silently downloading HTML.
+        if "kaggle.com/datasets" in raw_url and not raw_url.endswith(".csv"):
+            raise RuntimeError(
+                "Kaggle dataset page URLs cannot be downloaded directly (login required). "
+                "Please provide a direct raw CSV URL instead.\n"
+                "💡 Tip: Open the dataset on Kaggle → click the CSV file → copy the raw/download URL, "
+                "OR use a mirror like: https://raw.githubusercontent.com/... or any public direct CSV link."
+            )
+
+        # GitHub blob → raw
+        if "github.com" in raw_url and "/blob/" in raw_url:
+            raw_url = raw_url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+
+        job["log"].append(f"⬇️  Downloading dataset from {raw_url}")
+
+        # Determine local file extension
+        url_path = raw_url.split("?")[0]
+        ext = url_path.split(".")[-1].lower()
+        local_ext = ext if ext in ("csv", "json", "tsv", "zip") else "csv"
+        data_path = os.path.join(model_dir, f"dataset.{local_ext}")
 
         result = subprocess.run(
-            ["curl", "-L", "-o", data_path, req.dataset_url],
+            ["curl", "-L", "-A", "Mozilla/5.0", "-o", data_path, raw_url],
             capture_output=True, text=True, timeout=120
         )
         if result.returncode != 0:
             raise RuntimeError(f"Download failed: {result.stderr}")
+
+        # ── Unzip if needed ───────────────────────────────────────────────────
+        if data_path.endswith(".zip"):
+            job["log"].append("📦 Extracting zip archive…")
+            with zipfile.ZipFile(data_path, "r") as zf:
+                csv_files = [n for n in zf.namelist() if n.lower().endswith(".csv")]
+                if not csv_files:
+                    raise RuntimeError("No CSV file found inside the zip archive.")
+                zf.extract(csv_files[0], model_dir)
+                data_path = os.path.join(model_dir, csv_files[0])
+            job["log"].append(f"✅ Extracted → {data_path}")
+        else:
+            # Sanity-check: make sure we didn't download an HTML error page
+            with open(data_path, "r", errors="replace") as f:
+                head = f.read(512)
+            if head.strip().lower().startswith("<!doctype") or "<html" in head.lower():
+                raise RuntimeError(
+                    "The URL returned an HTML page, not a dataset file. "
+                    "Please provide a direct download link to a CSV/JSON/TSV file."
+                )
+
         job["log"].append(f"✅ Dataset saved → {data_path}")
 
         # ── Step 2: Load & inspect ────────────────────────────────────────────
@@ -70,7 +112,15 @@ def _run_training(job_id: str, req: TrainRequest):
         elif data_path.endswith(".tsv"):
             df = pd.read_csv(data_path, sep="\t")
         else:
-            df = pd.read_csv(data_path)
+            # Auto-detect delimiter (handles CSV, semicolon-CSV, tab, etc.)
+            with open(data_path, "r", errors="replace") as f:
+                sample = f.read(4096)
+            try:
+                dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
+                sep = dialect.delimiter
+            except csv.Error:
+                sep = ","
+            df = pd.read_csv(data_path, sep=sep, engine="python")
 
         job["log"].append(f"📊 Loaded {len(df)} rows × {len(df.columns)} columns")
         job["shape"] = {"rows": len(df), "cols": len(df.columns), "columns": list(df.columns)}
