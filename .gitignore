@@ -1,0 +1,42 @@
+# === Environment & Secrets ===
+.env
+.env.*
+*.env
+!.env.example
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+*.so
+*.log
+
+# === Node / Frontend ===
+node_modules/
+dist/
+.cache/
+*.local
+
+# === macOS ===
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# === Uploads / Runtime Data ===
+backend/uploads/
+backend/agent_workspace/
+backend/memory/
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
