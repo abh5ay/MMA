@@ -217,7 +217,8 @@ def _run_training(job_id: str, req: TrainRequest):
                 score = accuracy_score(y_test, preds)
                 results[name] = {"accuracy": round(float(score), 4)}
             else:
-                score = -mean_squared_error(y_test, preds, squared=False)  # negative RMSE
+                mse = mean_squared_error(y_test, preds)
+                score = -(mse ** 0.5)  # negative RMSE
                 results[name] = {"rmse": round(float(-score), 4)}
             if score > best_score:
                 best_score, best_model, best_name = score, model, name
