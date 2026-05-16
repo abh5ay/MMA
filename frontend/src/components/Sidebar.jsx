@@ -18,7 +18,7 @@ const AGENTS = [
 const MODELS = [
   { id: 'api:hf',           label: 'HuggingFace',          sub: 'Qwen-2.5 72B',         dot: '#37d399' },
   { id: 'api:nvidia',       label: 'NVIDIA NIM',           sub: 'Gemma-4 31B',          dot: '#76b900' },
-  { id: 'api:nvidia-mistral',label: 'NVIDIA Mistral',       sub: 'Mistral 3.5 128B',     dot: '#76b900' },
+  { id: 'api:nvidia-mistral',label: 'NVIDIA Mistral',       sub: 'Mistral Large',        dot: '#76b900' },
   { id: 'api:grok',         label: 'Grok 3',               sub: 'xAI · Fast',           dot: '#e879f9' },
   { id: 'api:gpt-oss',      label: 'GPT-OSS 120B',         sub: 'HuggingFace · OpenAI', dot: '#38bdf8' },
   { id: 'api:together',     label: 'DeepSeek Coder',       sub: 'Together · 33B',       dot: '#fb923c' },
