@@ -39,7 +39,7 @@ function PlanCard({ planContent, planReady, onApprove, loading }) {
   const [open, setOpen]     = useState(true);
   const [copied, setCopied] = useState(false);
   const text       = planContent || '';
-  const lineCount  = text.split('\n').length;
+  const lineCount  = text ? text.split('\n').length : 0;
   const isBuilding = !!text && !planReady;  // streaming in but not yet complete
 
   const handleCopy = async () => {
@@ -47,7 +47,7 @@ function PlanCard({ planContent, planReady, onApprove, loading }) {
     setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!text) return null;
+  if (!text && !planReady && !onApprove) return null;
 
   return (
     <Box sx={{ mx: 2, mb: 2, border: '1px solid rgba(124,92,252,0.4)', borderRadius: '12px', overflow: 'hidden', bgcolor: 'rgba(124,92,252,0.06)' }}>
@@ -320,7 +320,7 @@ export default function ChatWindow() {
             />
 
             {/* Plan card — shows as soon as first plan_token arrives */}
-            {msg.planContent && (
+            {(msg.planContent || msg.planReady) && (
               <PlanCard
                 planContent={msg.planContent}
                 planReady={msg.planReady}

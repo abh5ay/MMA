@@ -174,7 +174,8 @@ EXECUTION RULES — READ EVERY WORD:
 CONVERSATIONAL_STARTS = {
     'where', 'what', 'why', 'how', 'when', 'who', 'which', 'is', 'are',
     'did', 'does', 'was', 'were', 'tell', 'show', 'explain', 'describe',
-    'list', 'give', 'can', 'could', 'would', 'should', 'do', 'have', 'has'
+    'list', 'give', 'can', 'could', 'would', 'should', 'do', 'have', 'has',
+    'hello', 'hi', 'hey', 'greetings', 'morning', 'afternoon', 'evening'
 }
 
 def _is_conversational(prompt: str) -> bool:
