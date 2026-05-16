@@ -77,11 +77,19 @@ def _run_training(job_id: str, req: TrainRequest):
         data_path = os.path.join(model_dir, f"dataset.{local_ext}")
 
         result = subprocess.run(
-            ["curl", "-L", "-A", "Mozilla/5.0", "-o", data_path, raw_url],
+            ["curl", "-L", "-A", "Mozilla/5.0",
+             "-w", "%{http_code}",   # write HTTP status to stdout
+             "-o", data_path, raw_url],
             capture_output=True, text=True, timeout=120
         )
         if result.returncode != 0:
             raise RuntimeError(f"Download failed: {result.stderr}")
+        http_code = result.stdout.strip()
+        if http_code and http_code != "200":
+            raise RuntimeError(
+                f"URL returned HTTP {http_code}. "
+                "Please check the URL is a valid, publicly accessible direct download link."
+            )
 
         # ── Unzip if needed ───────────────────────────────────────────────────
         if data_path.endswith(".zip"):
@@ -121,6 +129,20 @@ def _run_training(job_id: str, req: TrainRequest):
             except csv.Error:
                 sep = ","
             df = pd.read_csv(data_path, sep=sep, engine="python")
+
+        # ── Validate the loaded dataframe ─────────────────────────────────────
+        if df.empty or len(df) == 0:
+            raise RuntimeError(
+                "The downloaded file loaded as an empty dataframe (0 rows). "
+                "The URL may be returning a 404/error page or an empty file. "
+                "Please verify the URL points to actual data."
+            )
+        if len(df.columns) < 2:
+            raise RuntimeError(
+                f"Dataset has only {len(df.columns)} column(s): {list(df.columns)}. "
+                "A valid dataset needs at least 2 columns (features + target). "
+                "Check that the URL points to a proper CSV file."
+            )
 
         job["log"].append(f"📊 Loaded {len(df)} rows × {len(df.columns)} columns")
         job["shape"] = {"rows": len(df), "cols": len(df.columns), "columns": list(df.columns)}
